@@ -43,6 +43,78 @@ POST /_analyze
 }
 ```
 
+There exist standard analyzers, i.e., built-in combinations of character filter, tokenizers and token filters. Specifically:
+
+* `standard` splits in words and removes punctuation, converts all to lowercase and provides a `stop` token filter to remove stop words, but it is disabled by default;
+* `simple`, similar to `standard`, but splits for anything else than a letter, and lowercasing is performed by the tokenizer and not the token filter to increase performance;
+* `whitespace` splits into tokens by whitespace, does not lowercase letters;
+* `keyword` does not split, does not lowercase, and does not remove stop words; it does emit the original text as a single token;
+* `pattern` uses a regular expression to match token separators (i.e., any match is used to split the text into tokens), and does lowercase letters by default;
+
+And additional ones, for instance related to language specific aspects. When built-in analyzers are not enough, it is possible to create custom ones, e.g.:
+
+```
+PUT /<index_name>
+{
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "my_analyzer": {
+          "type": "custom",
+          "char_filter": ["html_strip"],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "stop",
+            "snowball"
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+You can also customize the analyzer components, for instance by specifying for which language the stop words should refer to:
+
+```
+PUT /<index_name>
+{
+  "settings": {
+    "analysis": {
+      "char_filter":{},
+      "tokenizer":{},
+      "filter": {
+        "stop_english": {
+          "type": "stop",
+          "stopwords": "_english_"
+        }
+      },
+      "analyzer": {
+        "my_analyzer": {
+          "type": "custom",
+          "char_filter": ["html_strip"],
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "stop_english",
+            "snowball"
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+Mind that analyzers can not be added to existing indices, but only to new ones. To achieve this, the index can be temporarily disabled and then enabled again by:
+
+```
+POST /<index_name>/_close
+... # updating the index settings
+POST /<index_name>/_open
+```
+
 ## Quering terms
 
 In the context of search, tokens are generally referred to as terms. Extracted tokens are generally organized in an inverted index, i.e., a mapping from tokens to documents, where each document is identified by a unique ID and is associated to relevance information related to the search term. 
