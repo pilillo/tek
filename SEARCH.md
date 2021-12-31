@@ -232,3 +232,120 @@ GET /<index_name>/_search
   ]
 }
 ```
+
+## Joins
+
+Whereas ES does not provide a-la-relational-DB joins, it allows for (see [doc](https://www.elastic.co/guide/en/elasticsearch/reference/current/joining-queries.html)):
+* querying nested objects - and return hit information (using the `inner_hits` property)
+    ```
+    GET /<index_name>/_search
+    {
+        "query": {
+            "nested":{
+                "path": "nested_field",
+                "inner_hits":{},
+                "query":{
+                    <query on fields of the nested documents>
+                }
+            }
+        }
+    }
+    ```
+* parent-child queries - to retrieve child documents by parent and viceversa parent documents by child
+    this is firstly expressed in the mapping as join relationship between the parent and the child documents
+    ```
+    PUT /<index_name>
+    {
+        "mappings":{
+            "_doc":{
+                "properties":{
+                    "join_field":{
+                        "type":"join",
+                        "relations":{
+                            "<parent-type>":"<child-type>"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    ```
+
+    ```
+    PUT /<index_name>/1
+    {
+        "name": "<parent-document1>",
+        "join_field": {
+            "name": "<parent-type>"
+        }
+    }
+    ```
+
+    ```
+    PUT /<index_name>/2
+    {
+        "name": "<parent-document2>",
+        "join_field": {
+            "name": "<parent-type>"
+        }
+    }
+    ```
+
+    ```
+    PUT /<index_name>/3?routing=1
+    {
+        "name": "<child-document1>",
+        "join_field": {
+            "name": "<child-type>",
+            "parent": 1
+        }
+    }
+    ```
+    with routing indicating ES to store it on the same shard of the parent document;
+    the parent field indicates the id of the parent document within the index;
+
+    Now we can query for the child documents by parent:
+    ```
+    GET /<index_name>/_search
+    {
+        "query": {
+            "parent_id":{
+                "type": "<child_type>",
+                "id": <parent_id>
+            }
+        }
+    }
+    ```
+    
+    or when not knowing the parent id by using actual queries:
+    ```
+    GET /<index_name>/_search
+    {
+        "query": {
+            "has_parent":{
+                "type": "<parent-type>",
+                "query": {
+                    "name.keyword": "<parent-document1>"
+                }
+            }
+        }
+    }
+    ```
+    
+    and similarly by child:
+    ```
+    GET /<index_name>/_search
+    {
+        "query": {
+            "has_child":{
+                "type": "<child-type>",
+                "query": {
+                    "name.keyword": "<child-document1>"
+                }
+            }
+        }
+    }
+    ```
+
+    The inner term queries are in fact examples, you can use any query as presented before.
+    Mind also that the parent-child relationship is also usable for multi-level relationships.
